@@ -1,3 +1,5 @@
+//go:build !windows
+
 package tgt
 
 import (
@@ -28,7 +30,7 @@ type Tgt struct {
 	iscsiTargetRequestTimeout time.Duration
 }
 
-func New(frontendName string, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout time.Duration) types.Frontend {
+func New(frontendName string, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout time.Duration, _ ...string) types.Frontend {
 	s := socket.New()
 	return &Tgt{s, false, nil, frontendName, scsiTimeout, iscsiAbortTimeout, iscsiTargetRequestTimeout}
 }

@@ -16,7 +16,6 @@ import (
 	"k8s.io/mount-utils"
 
 	lhexec "github.com/longhorn/go-common-libs/exec"
-	lhns "github.com/longhorn/go-common-libs/ns"
 	lhutils "github.com/longhorn/go-common-libs/utils"
 	"github.com/longhorn/types/pkg/generated/enginerpc"
 
@@ -34,6 +33,7 @@ type Controller struct {
 	factory                   types.BackendFactory
 	backend                   *replicator
 	frontend                  types.Frontend
+	frontendListenAddress     string
 	isUpgrade                 bool
 	iscsiTargetRequestTimeout time.Duration
 	sharedTimeouts            *util.SharedTimeouts
@@ -78,12 +78,17 @@ func NewController(name string, factory types.BackendFactory, frontend types.Fro
 	salvageRequested, unmapMarkSnapChainRemoved bool, iscsiTargetRequestTimeout, engineReplicaTimeoutShort,
 	engineReplicaTimeoutLong time.Duration, dataServerProtocol types.DataServerProtocol, fileSyncHTTPClientTimeout,
 	snapshotMaxCount int, snapshotMaxSize int64, rebuildSyncConcurrentLimit int) *Controller {
+	frontendListenAddress := ""
+	if networkFrontend, ok := frontend.(interface{ ListenAddress() string }); ok {
+		frontendListenAddress = networkFrontend.ListenAddress()
+	}
 	c := &Controller{
-		factory:       factory,
-		VolumeName:    name,
-		frontend:      frontend,
-		metrics:       &types.Metrics{},
-		latestMetrics: &types.Metrics{},
+		factory:               factory,
+		VolumeName:            name,
+		frontend:              frontend,
+		frontendListenAddress: frontendListenAddress,
+		metrics:               &types.Metrics{},
+		latestMetrics:         &types.Metrics{},
 
 		isUpgrade:                 isUpgrade,
 		revisionCounterDisabled:   disableRevCounter,
@@ -270,7 +275,7 @@ func (c *Controller) Snapshot(inputName string, labels map[string]string, should
 	if !frozen {
 		// Revert to the previous/default behavior of syncing before taking a snapshot.
 		log.Info("Requesting system sync before snapshot")
-		if err := lhns.Sync(); err != nil {
+		if err := syncFilesystems(); err != nil {
 			// Sync should never fail, so it is likely due to the nsenter. To maintain existing behavior, we do not
 			// refuse to take a snapshot if sync fails.
 			log.WithError(err).Errorf("WARNING: failed to sync before snapshot; continuing without freeze or sync")
@@ -342,7 +347,7 @@ func (c *Controller) Expand(size int64) error {
 
 		// We perform a system level sync without the lock. Cannot block read/write
 		// Can be improved to only sync the filesystem on the block device later
-		if err := lhns.Sync(); err != nil {
+		if err := syncFilesystems(); err != nil {
 			// sync should never fail though, so it more like due to the nsenter
 			log.WithError(err).Errorf("WARNING: continue to expand to size %v for %v, but sync failed", size, c.VolumeName)
 		}
@@ -606,7 +611,7 @@ func (c *Controller) StartFrontend(frontend string) error {
 		}
 	}
 
-	f, err := NewFrontend(frontend, c.iscsiTargetRequestTimeout)
+	f, err := NewFrontend(frontend, c.iscsiTargetRequestTimeout, c.frontendListenAddress)
 	if err != nil {
 		return errors.Wrapf(err, "failed to find frontend: %s", frontend)
 	}

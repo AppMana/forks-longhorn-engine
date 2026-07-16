@@ -25,16 +25,16 @@ const (
 	additionalBufferTimeout = 30 * time.Second
 )
 
-func NewFrontend(frontendType string, iscsiTargetRequestTimeout time.Duration) (types.Frontend, error) {
+func NewFrontend(frontendType string, iscsiTargetRequestTimeout time.Duration, listenAddress string) (types.Frontend, error) {
 	switch frontendType {
 	case "rest":
 		return rest.New(), nil
 	case "socket":
 		return socket.New(), nil
 	case devtypes.FrontendTGTBlockDev:
-		return tgt.New(devtypes.FrontendTGTBlockDev, defaultScsiTimeout, defaultIscsiAbortTimeout, iscsiTargetRequestTimeout), nil
+		return tgt.New(devtypes.FrontendTGTBlockDev, defaultScsiTimeout, defaultIscsiAbortTimeout, iscsiTargetRequestTimeout, listenAddress), nil
 	case devtypes.FrontendTGTISCSI:
-		return tgt.New(devtypes.FrontendTGTISCSI, defaultScsiTimeout, defaultIscsiAbortTimeout, iscsiTargetRequestTimeout), nil
+		return tgt.New(devtypes.FrontendTGTISCSI, defaultScsiTimeout, defaultIscsiAbortTimeout, iscsiTargetRequestTimeout, listenAddress), nil
 	default:
 		return nil, fmt.Errorf("unsupported frontend type: %v", frontendType)
 	}

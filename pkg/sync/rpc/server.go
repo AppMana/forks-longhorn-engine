@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/cockroachdb/errors"
@@ -1036,9 +1035,7 @@ func (s *SyncAgentServer) BackupStatus(ctx context.Context, req *enginerpc.Backu
 
 func (*SyncAgentServer) BackupRemove(ctx context.Context, req *enginerpc.BackupRemoveRequest) (*emptypb.Empty, error) {
 	cmd := reexec.Command("backup", "delete", req.Backup)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Pdeathsig: syscall.SIGKILL,
-	}
+	util.ConfigureChildProcess(cmd)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {

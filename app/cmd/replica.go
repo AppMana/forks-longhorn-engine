@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"syscall"
 
 	"github.com/docker/go-units"
 	"github.com/sirupsen/logrus"
@@ -208,9 +207,7 @@ func startReplica(c *cli.Context) (err error) {
 				"--listen-port-range",
 				fmt.Sprintf("%v-%v", syncPort+1, syncPort+c.Int("sync-agent-port-count")),
 				"--replica-instance-name", replicaInstanceName)
-			cmd.SysProcAttr = &syscall.SysProcAttr{
-				Pdeathsig: syscall.SIGKILL,
-			}
+			util.ConfigureChildProcess(cmd)
 			cmd.Dir = dir
 			cmd.Stdout = os.Stdout
 			cmd.Stderr = os.Stderr

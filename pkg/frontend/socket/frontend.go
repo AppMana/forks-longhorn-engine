@@ -31,9 +31,19 @@ type Socket struct {
 	SectorSize  int
 	ScsiTimeout int
 
-	isUp         bool
-	socketPath   string
-	socketServer *dataconn.Server
+	isUp          bool
+	network       string
+	listenAddress string
+	socketPath    string
+	listener      net.Listener
+	socketServer  *dataconn.Server
+}
+
+// NewNetwork creates a data socket frontend on an explicit network endpoint.
+// The default New frontend remains a Unix socket so the Linux target path and
+// upgrade behaviour are unchanged.
+func NewNetwork(network, listenAddress string) *Socket {
+	return &Socket{network: network, listenAddress: listenAddress}
 }
 
 func (t *Socket) FrontendName() string {
@@ -65,6 +75,12 @@ func (t *Socket) Shutdown() error {
 			t.socketServer.Stop()
 			t.socketServer = nil
 		}
+		if t.listener != nil {
+			if err := t.listener.Close(); err != nil && !errors.Is(err, net.ErrClosed) {
+				return err
+			}
+			t.listener = nil
+		}
 	}
 	t.isUp = false
 
@@ -80,9 +96,16 @@ func (t *Socket) State() types.State {
 
 func (t *Socket) Endpoint() string {
 	if t.isUp {
+		if t.listenAddress != "" {
+			return t.listenAddress
+		}
 		return t.GetSocketPath()
 	}
 	return ""
+}
+
+func (t *Socket) ListenAddress() string {
+	return t.listenAddress
 }
 
 func (t *Socket) GetSocketPath() string {
@@ -93,6 +116,9 @@ func (t *Socket) GetSocketPath() string {
 }
 
 func (t *Socket) startSocketServer(rwu types.ReaderWriterUnmapperAt) error {
+	if t.network != "" {
+		return t.startNetworkServer(rwu)
+	}
 	socketPath := t.GetSocketPath()
 	if err := os.MkdirAll(filepath.Dir(socketPath), 0700); err != nil {
 		return errors.Wrapf(err, "cannot create directory %v", filepath.Dir(socketPath))
@@ -105,28 +131,30 @@ func (t *Socket) startSocketServer(rwu types.ReaderWriterUnmapperAt) error {
 	}
 
 	t.socketPath = socketPath
-	go func() {
-		if err := t.startSocketServerListen(rwu); err != nil {
-			logrus.WithError(err).Warn("Failed to start socket server")
-		}
-	}()
-	return nil
+	return t.startNetworkServer(rwu)
 }
 
-func (t *Socket) startSocketServerListen(rwu types.ReaderWriterUnmapperAt) error {
-	ln, err := net.Listen("unix", t.socketPath)
+func (t *Socket) startNetworkServer(rwu types.ReaderWriterUnmapperAt) error {
+	network, address := t.network, t.listenAddress
+	if network == "" {
+		network, address = "unix", t.socketPath
+	}
+	ln, err := net.Listen(network, address)
 	if err != nil {
 		return err
 	}
-	defer func() {
-		if errClose := ln.Close(); errClose != nil {
-			logrus.WithError(errClose).Errorf("Failed to close socket %v", t.socketPath)
-		}
-	}()
+	t.listener = ln
+	go t.acceptConnections(ln, rwu)
+	return nil
+}
 
+func (t *Socket) acceptConnections(ln net.Listener, rwu types.ReaderWriterUnmapperAt) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			logrus.WithError(err).Error("Failed to accept socket connection")
 			continue
 		}

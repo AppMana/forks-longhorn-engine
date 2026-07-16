@@ -41,6 +41,10 @@ func ControllerCmd() cli.Command {
 				Name:  "frontend",
 				Value: "",
 			},
+			cli.StringFlag{
+				Name:  "frontend-listen",
+				Usage: "Dedicated IP:port for network-exported frontends",
+			},
 			cli.StringSliceFlag{
 				Name:  "enable-backend",
 				Value: (*cli.StringSlice)(&[]string{"tcp"}),
@@ -121,6 +125,10 @@ func startController(c *cli.Context) error {
 	backends := c.StringSlice("enable-backend")
 	replicas := c.StringSlice("replica")
 	frontendName := c.String("frontend")
+	frontendListenAddress, err := frontendListenAddress(listen, c.String("frontend-listen"))
+	if err != nil {
+		return err
+	}
 	isUpgrade := c.Bool("upgrade")
 	disableRevCounter := c.Bool("disableRevCounter")
 	salvageRequested := c.Bool("salvageRequested")
@@ -185,7 +193,7 @@ func startController(c *cli.Context) error {
 
 	var frontend types.Frontend
 	if frontendName != "" {
-		f, err := controller.NewFrontend(frontendName, iscsiTargetRequestTimeout)
+		f, err := controller.NewFrontend(frontendName, iscsiTargetRequestTimeout, frontendListenAddress)
 		if err != nil {
 			return errors.Wrapf(err, "failed to find frontend: %s", frontendName)
 		}

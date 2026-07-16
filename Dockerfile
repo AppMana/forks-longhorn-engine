@@ -46,14 +46,6 @@ ENV MINIO_URL_amd64=https://dl.min.io/server/minio/release/linux-amd64/archive/m
     MINIO_URL=MINIO_URL_${ARCH}
 RUN curl -sSfL ${!MINIO_URL} -o /usr/bin/minio && chmod +x /usr/bin/minio
 
-# Install libqcow
-RUN curl -sSfL https://s3-us-west-1.amazonaws.com/rancher-longhorn/libqcow-alpha-20181117.tar.gz | tar xvzf - -C /usr/src && \
-    cd /usr/src/libqcow-20181117 && \
-    ./configure && \
-    make -j$(nproc) && \
-    make install && \
-    ldconfig
-
 # GRPC health probe
 ENV GRPC_HEALTH_PROBE_amd64=https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.3.2/grpc_health_probe-linux-amd64 \
     GRPC_HEALTH_PROBE_arm64=https://github.com/grpc-ecosystem/grpc-health-probe/releases/download/v0.3.2/grpc_health_probe-linux-arm64 \
@@ -73,6 +65,14 @@ RUN git clone https://github.com/longhorn/dep-versions.git -b ${SRC_BRANCH} /usr
         echo "Checking out tag ${SRC_TAG}"; \
         cd /usr/src/dep-versions && git checkout tags/${SRC_TAG}; \
     fi
+
+# Build libqcow from the version selected by the same dependency manifest as
+# the other Longhorn native libraries. The historical rancher-longhorn S3
+# tarball used here previously is no longer available.
+RUN export REPO_OVERRIDE="" && \
+    export COMMIT_ID_OVERRIDE="" && \
+    bash /usr/src/dep-versions/scripts/build-libqcow.sh "${REPO_OVERRIDE}" "${COMMIT_ID_OVERRIDE}" && \
+    ldconfig
 
 # Build liblonghorn
 RUN export REPO_OVERRIDE="" && \

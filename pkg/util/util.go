@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/handlers"
 	"github.com/sirupsen/logrus"
 
+	"github.com/longhorn/longhorn-engine/pkg/namedpipe"
 	"github.com/longhorn/longhorn-engine/pkg/types"
 )
 
@@ -232,6 +233,9 @@ func GetAddresses(volumeName, address string, dataServerProtocol types.DataServe
 		controlAddress, _, syncAddress, syncPort, err := ParseAddresses(address)
 		sockPath := filepath.Join(unixDomainSocketDirectoryInContainer, volumeName+".sock")
 		return controlAddress, sockPath, syncAddress, syncPort, err
+	case types.DataServerProtocolNPIPE:
+		controlAddress, _, syncAddress, syncPort, err := ParseAddresses(address)
+		return controlAddress, namedpipe.Path(volumeName), syncAddress, syncPort, err
 	default:
 		return "", "", "", -1, fmt.Errorf("unsupported protocol: %v", dataServerProtocol)
 	}

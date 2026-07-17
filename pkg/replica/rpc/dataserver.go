@@ -9,6 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/longhorn/longhorn-engine/pkg/dataconn"
+	"github.com/longhorn/longhorn-engine/pkg/namedpipe"
 	"github.com/longhorn/longhorn-engine/pkg/replica"
 	"github.com/longhorn/longhorn-engine/pkg/types"
 )
@@ -33,6 +34,8 @@ func (s *DataServer) ListenAndServe() error {
 		return s.listenAndServeTCP()
 	case types.DataServerProtocolUNIX:
 		return s.listenAndServeUNIX()
+	case types.DataServerProtocolNPIPE:
+		return s.listenAndServeNamedPipe()
 	default:
 		return fmt.Errorf("unsupported protocol: %v", s.protocol)
 	}
@@ -49,30 +52,7 @@ func (s *DataServer) listenAndServeTCP() error {
 		return err
 	}
 
-	for {
-		conn, err := l.AcceptTCP()
-		if err != nil {
-			logrus.WithError(err).Error("failed to accept tcp connection")
-			continue
-		}
-
-		logrus.Infof("New connection from: %v", conn.RemoteAddr())
-
-		go func(conn net.Conn) {
-			defer func() {
-				_ = conn.Close()
-			}()
-			server := dataconn.NewServer(conn, s.s)
-			if err := server.Handle(); err != nil {
-				if errors.Is(err, io.EOF) {
-					// Clean remote close: this is normal on detach, engine restart.
-					logrus.WithError(err).Info("Data server connection closed by remote")
-					return
-				}
-				logrus.WithError(err).Warn("Failed to handle data server")
-			}
-		}(conn)
-	}
+	return s.serveListener(l, "tcp")
 }
 
 func (s *DataServer) listenAndServeUNIX() error {
@@ -86,10 +66,22 @@ func (s *DataServer) listenAndServeUNIX() error {
 		return err
 	}
 
+	return s.serveListener(l, "unix-domain-socket")
+}
+
+func (s *DataServer) listenAndServeNamedPipe() error {
+	l, err := namedpipe.Listen(s.address)
+	if err != nil {
+		return err
+	}
+	return s.serveListener(l, "named-pipe")
+}
+
+func (s *DataServer) serveListener(listener net.Listener, protocol string) error {
 	for {
-		conn, err := l.AcceptUnix()
+		conn, err := listener.Accept()
 		if err != nil {
-			logrus.WithError(err).Error("failed to accept unix-domain-socket connection")
+			logrus.WithError(err).Errorf("failed to accept %s connection", protocol)
 			continue
 		}
 		logrus.Infof("New connection from: %v", conn.RemoteAddr())
@@ -100,7 +92,7 @@ func (s *DataServer) listenAndServeUNIX() error {
 			server := dataconn.NewServer(conn, s.s)
 			if err := server.Handle(); err != nil {
 				if errors.Is(err, io.EOF) {
-					logrus.WithError(err).Info("Data server connection closed by local peer")
+					logrus.WithError(err).Infof("%s data server connection closed by peer", protocol)
 					return
 				}
 				logrus.WithError(err).Warn("Failed to handle data server")

@@ -17,6 +17,7 @@ import (
 
 	"github.com/longhorn/longhorn-engine/pkg/dataconn"
 	"github.com/longhorn/longhorn-engine/pkg/interceptor"
+	"github.com/longhorn/longhorn-engine/pkg/namedpipe"
 	"github.com/longhorn/longhorn-engine/pkg/types"
 	"github.com/longhorn/longhorn-engine/pkg/util"
 
@@ -550,6 +551,8 @@ func connect(dataServerProtocol types.DataServerProtocol, address string) (net.C
 			return nil, err
 		}
 		return net.DialUnix("unix", nil, unixAddr)
+	case types.DataServerProtocolNPIPE:
+		return namedpipe.Dial(address)
 	default:
 		return nil, fmt.Errorf("unsupported protocol: %v", dataServerProtocol)
 	}

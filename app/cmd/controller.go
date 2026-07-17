@@ -74,7 +74,7 @@ func ControllerCmd() cli.Command {
 			cli.StringFlag{
 				Name:  "data-server-protocol",
 				Value: "tcp",
-				Usage: "Specify the data-server protocol. Available options are \"tcp\" and \"unix\"",
+				Usage: "Specify the data-server protocol. Available options are \"tcp\", \"unix\", and \"npipe\"",
 			},
 			cli.BoolFlag{
 				Name:   "unmap-mark-snap-chain-removed",

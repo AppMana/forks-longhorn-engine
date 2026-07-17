@@ -15,9 +15,17 @@ func TestPlatformCapabilities(t *testing.T) {
 		t.Fatal("replica does not advertise RWO")
 	}
 	if runtime.GOOS == "windows" {
-		for _, unsupported := range []string{CapabilityRWX, CapabilityStrictLocal, CapabilityEncryption} {
+		for _, unsupported := range []string{CapabilityRWX, CapabilityEncryption} {
 			if slices.Contains(capabilities.Replica, unsupported) {
 				t.Fatalf("Windows replica unexpectedly advertises %q", unsupported)
+			}
+		}
+		for role, advertised := range map[string][]string{
+			"controller": capabilities.Controller,
+			"replica":    capabilities.Replica,
+		} {
+			if !slices.Contains(advertised, CapabilityStrictLocal) {
+				t.Fatalf("Windows %s does not advertise strict-local", role)
 			}
 		}
 		if !slices.Contains(capabilities.Frontend, CapabilityReFS) {

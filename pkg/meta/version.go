@@ -74,6 +74,7 @@ func GetCapabilities() EngineCapabilities {
 		CapabilityRWO,
 		CapabilityRWOP,
 		CapabilityBestEffort,
+		CapabilityStrictLocal,
 	}
 	if runtime.GOOS == "windows" {
 		return EngineCapabilities{
@@ -96,7 +97,6 @@ func GetCapabilities() EngineCapabilities {
 	base = append(base, CapabilityBackingImage)
 	linux := append(base,
 		CapabilityRWX,
-		CapabilityStrictLocal,
 		CapabilityEncryption,
 		CapabilityFilesystemFreeze,
 	)

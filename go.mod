@@ -32,6 +32,15 @@ require (
 	k8s.io/mount-utils v0.36.1
 )
 
+// Windows V1 dependency sources. Keep vendor/ reproducible from public forks.
+replace github.com/longhorn/backupstore => github.com/AppMana/forks-backupstore v0.0.0-20260717191407-f15ea527a367
+
+replace github.com/longhorn/go-common-libs => github.com/AppMana/forks-go-common-libs v0.0.0-20260717150855-7a907bc7d6a5
+
+replace github.com/longhorn/go-iscsi-helper => github.com/AppMana/forks-go-iscsi-helper v0.0.0-20260717191413-40371a42de00
+
+replace github.com/longhorn/sparse-tools => github.com/AppMana/forks-sparse-tools v0.0.0-20260717191423-736c89bb9e50
+
 require (
 	github.com/Azure/azure-sdk-for-go/sdk/azcore v1.16.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.10.0 // indirect
